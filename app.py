@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import pdfplumber
-import tempfile
 import io
 import zipfile
 import requests
@@ -14,11 +12,9 @@ st.title("📦 Mini Logistics Tools")
 
 # ---------------------- Utilities ----------------------
 METRO_RANGES = [
-    range(110001, 110099), range(400001, 400105),
-    range(700001, 700105), range(600001, 600119),
-    range(560001, 560108), range(500001, 500099),
-    range(380001, 380062), range(411001, 411063),
-    range(122001, 122019)
+    range(110001, 110099), range(400001, 400105), range(700001, 700105),
+    range(600001, 600119), range(560001, 560108), range(500001, 500099),
+    range(380001, 380062), range(411001, 411063), range(122001, 122019)
 ]
 
 def is_metro(pin): return any(int(pin) in r for r in METRO_RANGES)
@@ -31,8 +27,9 @@ def get_location(pin):
         if data[0]["Status"].lower() == "success":
             po = data[0]["PostOffice"][0]
             return po.get("Name",""), po.get("District",""), po.get("State","")
-    except: pass
-    return "Unknown","Unknown","Unknown"
+    except: 
+        return "Unknown", "Unknown", "Unknown"
+    return "Unknown", "Unknown", "Unknown"
 
 def get_latlon(pin):
     try:
@@ -53,9 +50,10 @@ def haversine(lat1, lon1, lat2, lon2):
 def classify_zone(fpin, tpin, fd, fs, td, ts):
     special = {"himachal pradesh", "karnataka", "jammu & kashmir", "west bengal", "assam",
                "manipur", "mizoram", "nagaland", "tripura", "meghalaya", "sikkim", "arunachal pradesh"}
-    if fpin==tpin or (fd.lower()==td.lower() and fd!="N/A"): return "LOCAL"
+    if fpin == tpin: return "LOCAL"
+    if fd.lower() == td.lower() and fd != "N/A": return "LOCAL"
     if is_metro(fpin) and is_metro(tpin): return "METRO"
-    if fs.lower()==ts.lower(): return "REGIONAL"
+    if fs.lower() == ts.lower(): return "REGIONAL"
     if fs.lower() in special or ts.lower() in special: return "SPECIAL"
     return "ROI"
 
@@ -67,58 +65,29 @@ def process(row):
     lat2, lon2 = get_latlon(t)
     dist = haversine(lat1, lon1, lat2, lon2) if None not in [lat1, lon1, lat2, lon2] else "N/A"
     zone = classify_zone(f, t, fd, fs, td, ts)
-    return {
-        "From": f, "To": t,
-        "From City": fc, "From State": fs,
-        "To City": tc, "To State": ts,
-        "Distance (KM)": dist,
-        "Zone": zone
-    }
+    return {"From": f, "To": t, "From City": fc, "From State": fs, "To City": tc,
+            "To State": ts, "Distance (KM)": dist, "Zone": zone}
 
 # ---------------------- Sidebar ----------------------
-tool = st.sidebar.radio("Select Tool", ["Files Compiler", "Files Splitter", "Pincode Zone + Distance"])
+tool = st.sidebar.selectbox("Choose Tool", ["Data Compiler","Files Splitter","Pincode Zone + Distance"])
 
-# ---------------------- Files Compiler ----------------------
-if tool=="Files Compiler":
-    st.header("📁 Files Compiler")
-    mode = st.radio("Mode", ["Excel/CSV Upload", "PDF Upload"])
-    
-    if mode=="Excel/CSV Upload":
-        files = st.file_uploader("Upload Excel/CSV", type=["xlsx","csv"], accept_multiple_files=True)
-        if files:
-            dfs=[]
-            for f in files:
-                df = pd.read_csv(f) if f.name.endswith(".csv") else pd.read_excel(f)
-                df["Source File"]=f.name
-                dfs.append(df)
-            df_all=pd.concat(dfs, ignore_index=True).fillna("")
+# ---------------------- Data Compiler ----------------------
+if tool=="Data Compiler":
+    st.header("📁 Data Compiler (Excel/CSV Only)")
+    files = st.file_uploader("Upload Excel/CSV", type=["xlsx","csv"], accept_multiple_files=True)
+    if files:
+        dfs=[]
+        for f in files:
+            df0 = pd.read_csv(f) if f.name.endswith(".csv") else pd.read_excel(f)
+            df0["Source File"] = f.name
+            dfs.append(df0)
+        if dfs:
+            df_all = pd.concat(dfs, ignore_index=True).fillna("")
             st.dataframe(df_all, use_container_width=True)
             buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine='openpyxl') as writer:
-                df_all.to_excel(writer,index=False)
+            with pd.ExcelWriter(buf, engine='openpyxl') as w: 
+                df_all.to_excel(w, index=False)
             st.download_button("⬇️ Download Excel", buf.getvalue(), "compiled.xlsx")
-    
-    else:
-        uploaded_file = st.file_uploader("Upload PDF", type=["pdf"])
-        if uploaded_file:
-            temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            temp_pdf.write(uploaded_file.read())
-            temp_pdf.close()
-            tables=[]
-            try:
-                with pdfplumber.open(temp_pdf.name) as pdf:
-                    for page in pdf.pages:
-                        for t in page.extract_tables():
-                            tables.append(pd.DataFrame(t[1:], columns=t[0]))
-                if tables:
-                    temp_excel = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-                    with pd.ExcelWriter(temp_excel.name, engine='openpyxl') as writer:
-                        for i, df in enumerate(tables):
-                            df.to_excel(writer, sheet_name=f"Table_{i+1}", index=False)
-                    with open(temp_excel.name,"rb") as f:
-                        st.download_button("📥 Download Excel", f, file_name="compiled_from_pdf.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-            except Exception as e:
-                st.error(f"Error: {e}")
 
 # ---------------------- Files Splitter ----------------------
 elif tool=="Files Splitter":
@@ -128,37 +97,39 @@ elif tool=="Files Splitter":
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
         st.dataframe(df.head(), use_container_width=True)
         col_to_split = st.selectbox("Select column to split by", df.columns)
-        output_mode = st.radio("Output Format", ["Single Excel (Sheets)", "Multiple Excel Files (ZIP)"])
+        output_mode = st.radio("Output Format", ["Single Excel (Multiple Sheets)","Multiple Excel Files (ZIP)"])
         if col_to_split:
-            unique_vals = df[col_to_split].dropna().unique()
-            if output_mode=="Single Excel (Sheets)":
-                buf=io.BytesIO()
-                with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
+            unique_vals = df[col_to_split].dropna().unique().tolist()
+            if output_mode=="Single Excel (Multiple Sheets)":
+                buffer=io.BytesIO()
+                with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
                     for val in unique_vals:
-                        df[df[col_to_split]==val].to_excel(writer, sheet_name=str(val)[:31], index=False)
-                st.download_button("⬇️ Download Split Excel", buf.getvalue(), "split_output.xlsx")
+                        df_val = df[df[col_to_split]==val]
+                        df_val.to_excel(writer, sheet_name=str(val)[:31], index=False)
+                st.download_button("⬇️ Download Split Excel", buffer.getvalue(), "split_output.xlsx")
             else:
-                zip_buf=io.BytesIO()
-                with zipfile.ZipFile(zip_buf,"w") as zipf:
+                zip_buffer=io.BytesIO()
+                with zipfile.ZipFile(zip_buffer,"w") as zip_file:
                     for val in unique_vals:
-                        excel_buf=io.BytesIO()
-                        with pd.ExcelWriter(excel_buf, engine='xlsxwriter') as writer:
-                            df[df[col_to_split]==val].to_excel(writer, index=False)
-                        zipf.writestr(f"{val}.xlsx", excel_buf.getvalue())
-                st.download_button("⬇️ Download ZIP of Files", zip_buf.getvalue(), "split_files.zip")
+                        df_val=df[df[col_to_split]==val]
+                        excel_bytes=io.BytesIO()
+                        with pd.ExcelWriter(excel_bytes, engine="xlsxwriter") as writer:
+                            df_val.to_excel(writer, index=False)
+                        zip_file.writestr(f"{val}.xlsx", excel_bytes.getvalue())
+                st.download_button("⬇️ Download ZIP of Files", zip_buffer.getvalue(), "split_files.zip")
 
 # ---------------------- Pincode Zone + Distance ----------------------
 elif tool=="Pincode Zone + Distance":
     st.header("📍 Pincode Zone + Distance")
-    mode = st.radio("Mode", ["Upload File", "Manual Pairs"])
+    mode = st.radio("Mode", ["Upload File","Manual Pairs"])
     if mode=="Upload File":
-        fl = st.file_uploader("Upload CSV/XLSX with columns: from_pincode, to_pincode", type=["csv","xlsx"])
+        fl=st.file_uploader("Upload CSV/XLSX with columns from_pincode,to_pincode", type=["csv","xlsx"])
         if fl:
-            df0 = pd.read_csv(fl) if fl.name.endswith(".csv") else pd.read_excel(fl)
+            df0=pd.read_csv(fl) if fl.name.endswith(".csv") else pd.read_excel(fl)
             if 'from_pincode' in df0.columns and 'to_pincode' in df0.columns:
                 out=[process(r) for r in df0.to_dict("records")]
                 dfRes=pd.DataFrame(out)
-                st.dataframe(dfRes, use_container_width=True)
+                st.dataframe(dfRes,use_container_width=True)
                 st.download_button("⬇️ Download CSV", dfRes.to_csv(index=False).encode(), "zones.csv")
     else:
         txt=st.text_area("Enter pairs as 'from,to' per line",height=200)
@@ -166,4 +137,4 @@ elif tool=="Pincode Zone + Distance":
             pairs=[line.split(",") for line in txt.splitlines() if "," in line]
             df_pairs=pd.DataFrame(pairs,columns=["from_pincode","to_pincode"])
             out=[process(r) for r in df_pairs.to_dict("records")]
-            st.dataframe(pd.DataFrame(out), use_container_width=True)
+            st.dataframe(pd.DataFrame(out),use_container_width=True)
