@@ -87,8 +87,7 @@ tool = st.sidebar.selectbox("Choose Tool", [
     "Data Compiler",
     "Files Splitter",
     "Pincode Zone + Distance",
-    "Data Cleaner & Summary",
-    "Merge Two Files"
+    "Data Cleaner & Summary"
 ])
 st.sidebar.markdown("---")
 st.sidebar.markdown("💡 **Tips for Beginners:**")
@@ -98,7 +97,6 @@ st.sidebar.markdown("""
 - Use 'Files Splitter' to split large files by a column.
 - 'Pincode Zone + Distance' helps classify and calculate distances.
 - 'Data Cleaner & Summary' cleans files and shows basic stats.
-- 'Merge Two Files' merges files on a selected column.
 - All downloads are in CSV format to avoid dependency issues.
 """)
 
