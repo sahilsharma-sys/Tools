@@ -180,4 +180,11 @@ elif tool=="Merge Two Files":
     st.header("🔗 Merge Two Files")
     uploaded_files = st.file_uploader("Upload 2 CSV/Excel files", type=["csv","xlsx"], accept_multiple_files=True)
     if uploaded_files and len(uploaded_files)==2:
-        df1 =
+        df1 = pd.read_csv(uploaded_files[0]) if uploaded_files[0].name.endswith(".csv") else pd.read_excel(uploaded_files[0])
+        df2 = pd.read_csv(uploaded_files[1]) if uploaded_files[1].name.endswith(".csv") else pd.read_excel(uploaded_files[1])
+        common_cols = df1.columns.intersection(df2.columns)
+        merge_col = st.selectbox("Select column to merge on", common_cols)
+        if merge_col:
+            df_merged = pd.merge(df1, df2, on=merge_col, how='outer')
+            st.dataframe(df_merged, use_container_width=True)
+            st.download_button("⬇️ Download Merged CSV", df_merged.to_csv(index=False).encode(), "merged_file.csv")
