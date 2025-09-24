@@ -6,6 +6,8 @@ import requests
 from math import radians, sin, cos, sqrt, atan2
 from concurrent.futures import ThreadPoolExecutor
 import os
+from fpdf import FPDF
+import pdfplumber
 
 st.set_page_config(page_title="Helper Tool- Sahil", layout="wide")
 st.title("📦 Helper Tool - Sahil (Beginner Friendly, CSV Only)")
@@ -89,7 +91,8 @@ tool = st.sidebar.selectbox("Choose Tool", [
     "Files Splitter",
     "Pincode Zone + Distance",
     "Data Cleaner & Summary",
-    "Create Folders from List"
+    "Create Folders from List",
+    "PDF & Excel Converter"
 ])
 st.sidebar.markdown("---")
 st.sidebar.markdown("💡 **Tips for Beginners:**")
@@ -100,7 +103,7 @@ st.sidebar.markdown("""
 - 'Pincode Zone + Distance' helps classify and calculate distances.
 - 'Data Cleaner & Summary' cleans files and shows basic stats.
 - 'Create Folders from List' generates folders or ZIP download.
-- All downloads are in CSV format to avoid dependency issues.
+- 'PDF & Excel Converter' converts Excel ↔ PDF.
 """)
 
 # ---------------------- Data Compiler ----------------------
@@ -193,3 +196,40 @@ elif tool=="Create Folders from List":
                 zf.writestr(f"{name}/", "")  # Folder in ZIP
         st.success(f"{len(folder_names)} folders created in '{base_folder}'!")
         st.download_button("⬇️ Download Folders as ZIP", zip_buffer.getvalue(), "folders.zip")
+
+# ---------------------- PDF & Excel Converter ----------------------
+elif tool=="PDF & Excel Converter":
+    st.header("📄 PDF ↔ Excel Converter")
+    mode = st.radio("Conversion Mode", ["Excel → PDF", "PDF → Excel"])
+    
+    if mode=="Excel → PDF":
+        uploaded_file = st.file_uploader("Upload Excel/XLSX file", type=["xlsx","csv"])
+        if uploaded_file:
+            df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
+            st.dataframe(df, use_container_width=True)
+            if st.button("Convert to PDF"):
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", size=12)
+                for i, row in df.iterrows():
+                    row_text = " | ".join(str(x) for x in row.values)
+                    pdf.cell(0, 8, row_text, ln=True)
+                pdf_buffer = io.BytesIO()
+                pdf.output(pdf_buffer)
+                st.download_button("⬇️ Download PDF", pdf_buffer.getvalue(), "converted.pdf")
+                
+    else:  # PDF → Excel
+        uploaded_pdf = st.file_uploader("Upload PDF file", type=["pdf"])
+        if uploaded_pdf:
+            if st.button("Convert to Excel"):
+                all_data = []
+                with pdfplumber.open(uploaded_pdf) as pdf:
+                    for page in pdf.pages:
+                        table = page.extract_table()
+                        if table:
+                            df = pd.DataFrame(table[1:], columns=table[0])
+                            all_data.append(df)
+                if all_data:
+                    final_df = pd.concat(all_data, ignore_index=True)
+                    st.dataframe(final_df, use_container_width=True)
+                    st.download_button("⬇️ Download Excel", final_df.to_excel(index=False), "converted.xlsx")
