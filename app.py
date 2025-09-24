@@ -6,7 +6,6 @@ import requests
 from math import radians, sin, cos, sqrt, atan2
 from concurrent.futures import ThreadPoolExecutor
 import os
-from fpdf import FPDF
 
 st.set_page_config(page_title="Helper Tool- Sahil", layout="wide")
 st.title("📦 Helper Tool - Sahil (Beginner Friendly, CSV Only)")
@@ -100,7 +99,7 @@ st.sidebar.markdown("""
 - Use 'Files Splitter' to split large files by a column.
 - 'Pincode Zone + Distance' helps classify and calculate distances.
 - 'Data Cleaner & Summary' cleans files and shows basic stats.
-- 'Create Folders from List' generates folders, ZIP, or PDF download.
+- 'Create Folders from List' generates folders or ZIP download.
 - All downloads are in CSV format to avoid dependency issues.
 """)
 
@@ -177,7 +176,7 @@ elif tool=="Data Cleaner & Summary":
             st.subheader("Summary")
             st.json(summary)
 
-# ---------------------- Create Folders from List (with PDF) ----------------------
+# ---------------------- Create Folders from List ----------------------
 elif tool=="Create Folders from List":
     st.header("📂 Create Folders from List")
     txt = st.text_area("Enter folder names, one per line", height=200)
@@ -186,25 +185,11 @@ elif tool=="Create Folders from List":
 
     if st.button("✅ Create Folders"):
         folder_names = [line.strip() for line in txt.splitlines() if line.strip()]
-
-        # Create folders + ZIP
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, "w") as zf:
             for name in folder_names:
                 folder_path = os.path.join(base_folder, name)
                 os.makedirs(folder_path, exist_ok=True)
-                zf.writestr(f"{name}/", "")
+                zf.writestr(f"{name}/", "")  # Folder in ZIP
         st.success(f"{len(folder_names)} folders created in '{base_folder}'!")
         st.download_button("⬇️ Download Folders as ZIP", zip_buffer.getvalue(), "folders.zip")
-
-        # Create PDF of folder names
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-        pdf.cell(0, 10, "Folder Names", ln=True, align="C")
-        pdf.ln(5)
-        for idx, name in enumerate(folder_names, 1):
-            pdf.cell(0, 8, f"{idx}. {name}", ln=True)
-        pdf_buffer = io.BytesIO()
-        pdf.output(pdf_buffer)
-        st.download_button("⬇️ Download Folder Names as PDF", pdf_buffer.getvalue(), "folders.pdf")
