@@ -117,7 +117,7 @@ if tool=="Data Compiler":
             df_all = pd.concat(dfs, ignore_index=True).fillna("")
             st.dataframe(df_all, use_container_width=True)
             buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine='openpyxl') as w: 
+            with pd.ExcelWriter(buf, engine='xlsxwriter') as w:  # ✅ Changed engine
                 df_all.to_excel(w, index=False)
             st.download_button("⬇️ Download Excel", buf.getvalue(), "compiled.xlsx")
 
@@ -183,7 +183,7 @@ elif tool=="File Format Converter":
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
         if uploaded_file.name.endswith(".csv"):
             buf = io.BytesIO()
-            with pd.ExcelWriter(buf, engine='openpyxl') as w: 
+            with pd.ExcelWriter(buf, engine='xlsxwriter') as w: 
                 df.to_excel(w, index=False)
             st.download_button("⬇️ Download as Excel", buf.getvalue(), uploaded_file.name.replace(".csv",".xlsx"))
         else:
