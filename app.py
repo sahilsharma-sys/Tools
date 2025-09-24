@@ -89,7 +89,7 @@ tool = st.sidebar.selectbox("Choose Tool", [
     "Files Splitter",
     "Pincode Zone + Distance",
     "Data Cleaner & Summary",
-    "Folder Creator"
+    "Create Folders from List"
 ])
 st.sidebar.markdown("---")
 st.sidebar.markdown("💡 **Tips for Beginners:**")
@@ -99,7 +99,7 @@ st.sidebar.markdown("""
 - Use 'Files Splitter' to split large files by a column.
 - 'Pincode Zone + Distance' helps classify and calculate distances.
 - 'Data Cleaner & Summary' cleans files and shows basic stats.
-- 'Folder Creator' creates folders from a list or CSV column.
+- 'Create Folders from List' generates folders or ZIP download.
 - All downloads are in CSV format to avoid dependency issues.
 """)
 
@@ -176,42 +176,20 @@ elif tool=="Data Cleaner & Summary":
             st.subheader("Summary")
             st.json(summary)
 
-# ---------------------- Folder Creator ----------------------
-elif tool=="Folder Creator":
-    st.header("📂 Folder Creator from List/CSV")
-    
-    # Base path
-    base_path = st.text_input("Enter base path to create folders", value=os.getcwd())
-    
-    # Option 1: Manual entry
-    st.subheader("Create folders manually")
-    txt = st.text_area("Enter folder names (one per line)", height=200)
-    if st.button("Create Folders from Text"):
-        if not txt.strip():
-            st.warning("Please enter folder names")
-        else:
-            names = [line.strip() for line in txt.splitlines() if line.strip()]
-            created = []
-            for name in names:
-                folder_path = os.path.join(base_path, name)
+# ---------------------- Create Folders from List ----------------------
+elif tool=="Create Folders from List":
+    st.header("📂 Create Folders from List")
+    txt = st.text_area("Enter folder names, one per line", height=200)
+    base_folder = "Created_Folders"
+    os.makedirs(base_folder, exist_ok=True)
+
+    if st.button("✅ Create Folders"):
+        folder_names = [line.strip() for line in txt.splitlines() if line.strip()]
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w") as zf:
+            for name in folder_names:
+                folder_path = os.path.join(base_folder, name)
                 os.makedirs(folder_path, exist_ok=True)
-                created.append(folder_path)
-            st.success(f"✅ Created {len(created)} folders")
-            st.write("Folders created:")
-            st.write(created)
-    
-    # Option 2: From CSV/XLSX
-    st.subheader("Create folders from CSV/XLSX")
-    uploaded_file = st.file_uploader("Upload CSV/XLSX with folder names", type=["csv","xlsx"])
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
-        col_name = st.selectbox("Select column with folder names", df.columns)
-        if st.button("Create Folders from CSV"):
-            created = []
-            for name in df[col_name].dropna().astype(str):
-                folder_path = os.path.join(base_path, name.strip())
-                os.makedirs(folder_path, exist_ok=True)
-                created.append(folder_path)
-            st.success(f"✅ Created {len(created)} folders")
-            st.write("Folders created:")
-            st.write(created)
+                zf.writestr(f"{name}/", "")  # Folder in ZIP
+        st.success(f"{len(folder_names)} folders created in '{base_folder}'!")
+        st.download_button("⬇️ Download Folders as ZIP", zip_buffer.getvalue(), "folders.zip")
