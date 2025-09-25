@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 import os
 
 st.set_page_config(page_title="Helper Tool- Sahil", layout="wide")
-st.title("📦 Helper Tool - Sahil (Beginner Friendly, CSV Only)")
+st.title("📦 Helper Tool - Sahil")
 
 # ---------------------- Utilities ----------------------
 METRO_RANGES = [
